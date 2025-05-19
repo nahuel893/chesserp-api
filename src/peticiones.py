@@ -6,15 +6,15 @@ from dotenv import load_dotenv
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
-
 class Endpoint:
     def __init__(self):
         
-        self.basePath = load_dotenv("API_URL")
+        load_dotenv()
+        self.basePath = os.getenv("API_URL")
         self.baseURL  = f"{self.basePath}/web/api"
         self.loginURL = f"{self.basePath}/web/api/chess/v1/auth/login"
         self.credentials = {
-            "usuario": load_dotenv("USERNAME"), "password": load_dotenv("PASSWORD")
+            "usuario": os.getenv("USERNAME"), "password": os.getenv("PASSWORD")
         }
         self.sessionId = None
         self.depositos = {"1": ""}
@@ -23,6 +23,8 @@ class Endpoint:
     def login(self):
         try:
             # Realizamos la solicitud POST para loguearnos
+            print("basePath:", self.basePath)
+            print("loginUrl:", self.loginURL)
             response = requests.post(self.loginURL, json=self.credentials)
 
             # Verificamos si la respuesta es JSON y obtenemos el sessionId
@@ -107,46 +109,28 @@ class Endpoint:
             exit()
     
     def get_sessionId(self):
-        return self.sessionId
-    
-    def stock(self, fecha, idDeposito=None):
-        stock_url = self.basePath + "/web/api/chess/v1/stock/"
+        return self.sessionId    
+
+    def stock(self, date=datetime.now().strftime("%d-%m-%Y"), idDeposito="1"):
+        stock_url = self.baseURL + "/chess/v1/stock/"
         headers = {"Cookie": self.sessionId}
-        stocks = []
         params = {
-            "idDeposito": "1",
+            "idDeposito": idDeposito,
             "frescura": "false",
-            "DD-MM-AAAA": "19-05-2025" 
+            "DD-MM-AAAA": date 
         }
-        if (idDeposito):
-            try:
-                response = requests.get(url=stock_url, params=params, headers=headers)
-                if response.status_code == 200:
-                    params['idDeposito'] = idDeposito
-                    stocks.append(response.json())
-
-            except Exception as error:
+        try:
+            params['idDeposito'] = idDeposito
+            params['DD-MM-AAAA'] = date
+            response = requests.get(url=stock_url, params=params, headers=headers)
+            if response.status_code == 200:
+                return response.json()
+        except Exception as error:
                 print("Error processing stock", error)
-        else:
-            try:
-                for idDep in self.depositos.keys():
-                    params['idDeposito'] = idDep
-
-                    response = requests.get(url=stock_url, params=params, headers=headers)
-                    if response.status_code == 200:
-                        stocks.append(response.json())
-
-            except Exception as error:
-                print("Error processing stocks", error)
-
-        
-            return response.json()
-        return None
 
 
 if __name__ == "__main__":
     endpoint = Endpoint()
-    sessionId = endpoint.get_sessionId()
-
-    print(sessionId)
+    endpoint.login()
+    print(endpoint.get_sessionId())
     print(endpoint.stock())

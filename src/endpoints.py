@@ -11,8 +11,8 @@ class Endpoints:
         
         load_dotenv()
         self.basePath = os.getenv("API_URL")
-        self.baseURL  = f"{self.basePath}/web/api"
-        self.loginURL = f"{self.basePath}/web/api/chess/v1/auth/login"
+        self.baseURL  = f"{self.basePath}web/api"
+        self.loginURL = f"{self.basePath}web/api/chess/v1/auth/login"
         self.credentials = {
             "usuario": os.getenv("USERNAME"), "password": os.getenv("PASSWORD")
         }

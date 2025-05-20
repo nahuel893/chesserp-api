@@ -1,6 +1,6 @@
-from peticiones import Endpoint
+from endpoints import Endpoints
 from datetime import datetime, timedelta
-import data
+
 import os
 
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -10,17 +10,10 @@ print(ABS_PATH)
 print(FATHER_PATH)
 print(DATA_PATH)
 
-
-
-
-
-
-
 def main(): # Creamos una instancia de la clase Endpoint
-    endpoint = Endpoint()
+    endpoint = Endpoints()
     # Realizamos el login
     response = endpoint.login()
-    print(response.json())
     # # Obtenemos el reporte
     # start_date = datetime(2025, 4, 1)
     # end_date = datetime(2025, 4, 30)  # Adjust this date as needed

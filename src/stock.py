@@ -5,74 +5,83 @@ import os
 from dotenv import load_dotenv
 
 
-class Stock:
+class StockData:
     def __init__(self, endpoint):
-        load_dotenv() # verify ambit
 
         self.data_dir = os.path.abspath(os.path.join((os.getcwd()), "data"))
         self.endpoint = endpoint
         self.stock = pd.DataFrame()
-        self.df_deposits = pd.read_csv(os.path.join(self.data_dir, "deposits.csv"), sep=',')
-        self.df_deposits.rename(columns={'Deposito':'idDeposito'}, inplace=True)
 
-        self.df_bloat_articles = pd.read_excel(os.path.join(self.data_dir, "bloat_articles.xlsx")) # migrate to .csv)
-        self.df_bloat_articles = self.df_bloat_articles[['CODIGO', 'SIRVE']]
+    def load_extra_data(
+        self,
+        df_deposits_path: str,
+        df_bloat_articles_path: str,
+        df_categories_path: str,
+        deposits_col: str = "Deposito",
+        bloat_articles_col: str = "CODIGO",
+        bloat_articles_col_flag: str = "SIRVE",
+        categories_id_col: str = "CODIGO",
+        categories_col: str = "GENERICO"
+    ) -> None:
+        """
+        Loads and processes additional data required for stock management, including deposits, bloat articles, and categories.
+        Args:
+            df_deposits_path (str): Path to the CSV file containing deposit information. Relation id/description
+            df_bloat_articles_path (str): Path to the Excel file containing bloat articles information.
+            df_categories_path (str): Path to the Excel file containing article categories.
+            deposits_col (str, optional): Name of the column in the deposits file to be used as the deposit ID. Defaults to "Deposito".
+            bloat_articles_col (str, optional): Name of the column in the bloat articles file to be used as the article ID. Defaults to "CODIGO".
+            categories_col (str, optional): Name of the column in the categories file to be used as the article ID. Defaults to "CODIGO".
+        Side Effects:
+            Loads the data from the specified files and assigns processed DataFrames to the instance attributes:
+                - self.df_deposits
+                - self.df_bloat_articles
+                - self.df_categories
+            Renames relevant columns for consistency across DataFrames.
+        """
+        # Load deposits and rename column
+        self.df_deposits = pd.read_csv(df_deposits_path, sep=',')
+        self.df_deposits.rename(
+            columns={deposits_col: 'idDeposito'}, inplace=True)
 
-        self.df_bloat_articles.rename(columns={'CODIGO':'idArticulo'}, inplace=True) # NEW FUTURE CLASS, data of endpoint
+        # Load bloat articles and rename column
+        self.df_bloat_articles = pd.read_csv(df_bloat_articles_path)
+        self.df_bloat_articles = self.df_bloat_articles[[
+            bloat_articles_col, 'SIRVE']]
+        self.df_bloat_articles.rename(
+            columns={bloat_articles_col: 'idArticulo'}, inplace=True)
 
-        #self.df_categorys = os.getenv('PATH_ART') # Migrate to obtain to api chsserp
-        # Load categorization for articles
-        self.df_categorys = pd.read_excel(os.path.join(self.data_dir, "articulos.xlsx"))
-        self.df_categorys.rename(columns={'CODIGO':'idArticulo'}, inplace=True) # NEW FUTURE CLASS, data of endpoint
+        # Load categories and rename column
+        self.df_categories = pd.read_csv(df_categories_path)
+        self.df_categories.rename(
+            columns={categories_id_col: 'idArticulo'}, inplace=True)
+        self.categories_col = categories_col
 
-    def get_stock_default(self) -> pd.DataFrame:
-        return self.__to_df(self.endpoint.get_stock())
-    
-    def __to_df(self, dic: dict) -> pd.DataFrame:
-        columns = ["idDeposito", "idArticulo", "dsArticulo", "cantBultos", "cantUnidades"]
-        df = pd.DataFrame(dic['dsStockFisicoApi']['dsStock'])[columns]
-        return df
-
-    def get_stock(self, date: str, idDep: str) -> pd.DataFrame:
-        self.stock = self.__to_df(self.endpoint.get_stock(date, idDep))
-        return self.stock
-
-    def get_stocks(self) -> pd.DataFrame:        
-        list_ = []
-        
-        for index, row in self.df_deposits.iterrows():
-            list_.append(self.__to_df(self.endpoint.get_stock(idDeposito=row['idDeposito'])))
-    
-        self.stock = pd.concat(list_, ignore_index=True)
-
-        # Add deposit description and branch description
+    def transform_data(self) -> None:
+        #Add deposit description and branch description
         self.stock = pd.merge(
             self.stock,
-            self.df_deposits, 
+            self.df_deposits,
             on='idDeposito',
             how='left'
         ).reset_index()
-
+ 
         # Delete bloat articles
-        self.stock = pd.merge(
-            self.stock,
-            self.df_bloat_articles,
-            on='idArticulo',
-            how='left'
-        ).reset_index()
-        self.stock = self.stock[self.stock.SIRVE.isna()]
-
+        self.stock = self.stock[~self.stock['idArticulo'].isin(
+            self.df_bloat_articles["idArticulo"])]
+ 
         # Add categorization
         self.stock = pd.merge(
             self.stock,
-            self.df_categorys[['idArticulo', 'GENERICO', 'MARCA']],
+            self.df_categories[['idArticulo', 'GENERICO', 'MARCA']],
             on='idArticulo',
             how='left'
         )
  
-        # Order by Sucursal 
+        # Order by Sucursal
         self.stock.sort_values(by="Sucursal", inplace=True)
-        
+ 
+        # Pivot Stock, columns by Sucursal
         self.stock = self.stock.pivot_table(
             values='cantBultos',
             index=['idArticulo', 'dsArticulo', 'GENERICO', 'MARCA'],
@@ -80,18 +89,43 @@ class Stock:
             aggfunc='sum',
         ).reset_index()
 
-        # to-do: move data transformation to another method 
+    def get_stock_default(self) -> pd.DataFrame:
+        self.stock = self.__to_df(self.endpoint.get_stock())
+        return self.stock
+
+    def __to_df(self, dic: dict) -> pd.DataFrame:
+        columns = ["idDeposito", "idArticulo",
+                   "dsArticulo", "cantBultos", "cantUnidades"]
+        df = pd.DataFrame(dic['dsStockFisicoApi']['dsStock'])[columns]
+        return df
+
+    def get_stock(self, date: str, idDep: str) -> pd.DataFrame:
+        self.stock = self.__to_df(self.endpoint.get_stock(date, idDep))
+        return self.stock
+
+    def get_stocks(self) -> pd.DataFrame:
+        list_ = []
+
+        for index, row in self.df_deposits.iterrows():
+            list_.append(self.__to_df(
+                self.endpoint.get_stock(idDeposito=row['idDeposito'])))
+
+        self.stock = pd.concat(list_, ignore_index=True)
 
         return self.stock
 
-    def to_excel(self) -> None:
-        self.stock.to_excel(os.path.join(self.data_dir, "stock.xlsx"))
+    def to_excel(self, name: str = "stock") -> None:
+        self.stock.to_excel(os.path.join(self.data_dir, f"{name}.xlsx"))
+
+    def to_csv(self, name: str = "stock") -> None:
+        self.stock.to_csv(os.path.join(self.data_dir, f"{name}.csv"))
+
 
 if __name__ == "__main__":
-    endp = Endpoints()
+    load_dotenv()
+    endp = Endpoints(os.getenv("API_URL_S"), os.getenv(
+        "USERNAME_S"), os.getenv("PASSWORD_S"))
     endp.login()
-    stock = Stock(endp)
+    stock = StockData(endp)
     stock.get_stocks()
     stock.to_excel()
-
-    print(stock)

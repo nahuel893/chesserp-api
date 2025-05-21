@@ -1,20 +1,64 @@
 from endpoints import Endpoints
 from datetime import datetime, timedelta
-
+from stock import StockData
 import os
+from dotenv import load_dotenv
 
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 FATHER_PATH = os.path.dirname(ABS_PATH)
-DATA_PATH = os.path.dirname(FATHER_PATH)
+DATA_PATH = os.path.join(os.path.dirname(ABS_PATH), "data")
 print(ABS_PATH)
 print(FATHER_PATH)
 print(DATA_PATH)
 
+"""
+    TO-DO:
+    * Import and export to csv
+    * Add logger
+    * Add tests
+    * Create Sales class
+"""
 def main(): # Creamos una instancia de la clase Endpoint
-    endpoint = Endpoints()
+    load_dotenv()
+
+    # Login Chess B
+    endp = Endpoints(os.getenv("API_URL_B"), os.getenv("USERNAME_B"), os.getenv("PASSWORD_B"))
+    endp.login()
+
+    # Login
+    stock = StockData(endp)
+    stock.load_extra_data(
+        df_deposits_path= os.path.join(DATA_PATH, "deposits_b.csv"),
+        df_bloat_articles_path= os.path.join(DATA_PATH, "bloat_articles_b.csv"),
+        df_categories_path= os.path.join(DATA_PATH, "categories_b.csv"),
+    )
+    stock.get_stocks()
+    stock.transform_data()
+    stock.to_csv(name="stock_b")
+
+    endp.voucher_rep("ventas_hoy", "2025-05-01", "2025-05-30")
+
+    # Login Chess S
+    endp = Endpoints(os.getenv("API_URL_S"), os.getenv("USERNAME_B"), os.getenv("PASSWORD_B"))
+    endp.login()
+
+    # Login
+    stock = StockData(endp)
+    stock.load_extra_data(
+        df_deposits_path= os.path.join(DATA_PATH, "deposits_s.csv"),
+        df_bloat_articles_path= os.path.join(DATA_PATH, "bloat_articles_s.csv"),
+        df_categories_path= os.path.join(DATA_PATH, "categories_s.csv"),
+    )
+    stock.get_stocks()
+    stock.transform_data()
+    stock.to_csv(name="stock_s")
+
+    # Get report of sales
+
+
     # Realizamos el login
-    response = endpoint.login()
-    # # Obtenemos el reporte
+    # response = endpoint.login()
+    # Obtenemos el reporte
     # start_date = datetime(2025, 4, 1)
     # end_date = datetime(2025, 4, 30)  # Adjust this date as needed
 

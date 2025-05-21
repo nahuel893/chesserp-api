@@ -61,17 +61,23 @@ Impuestos Internos
 Subtotal Final'''
 
 base_path = os.path.dirname(os.path.abspath(__file__))
+columnas_importantes = columnas_importantes.split('\n')
 
 # file_path = os.path.join(base_path, '../data/columnas_importantes.txt')
 # with open(file_path, 'r', encoding='utf-8') as file:
 #     columnas_importantes = file.read()
+class SalesData:
+    def __init__(self, endpoint):
+        self.data_dir = os.path.abspath(os.path.join((os.getcwd()), "data"))
+        self.endpoint = endpoint
+        self.sales = pd.DataFrame()
 
-columnas_importantes = columnas_importantes.split('\n')
+    def delete_bloat_columns(self, path):
+        df = pd.read_csv(path, sep="\t", encoding='latin1', low_memory=False)
+        df = df[columnas_importantes]
+        df.to_excel(os.path.join(base_path, '../data/procesado/'), index=False)
+    
 
-def delete_bloat_columns(path):
-    df = pd.read_csv(path, sep="\t", encoding='latin1', low_memory=False)
-    df = df[columnas_importantes]
-    df.to_excel(os.path.join(base_path, '../data/procesado/'), index=False)
 
 # def insert_in_db():
 #     pass

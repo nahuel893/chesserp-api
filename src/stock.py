@@ -57,6 +57,13 @@ class StockData:
             columns={categories_id_col: 'idArticulo'}, inplace=True)
         self.categories_col = categories_col
 
+        print("df_deposits")
+        print(self.df_deposits.head())
+        print("df_bloat_articles")
+        print(self.df_bloat_articles.head())
+        print("df_categories")
+        print(self.df_categories.head())
+
     def transform_data(self) -> None:
         #Add deposit description and branch description
         self.stock = pd.merge(
@@ -118,7 +125,7 @@ class StockData:
         self.stock.to_excel(os.path.join(self.data_dir, f"{name}.xlsx"))
 
     def to_csv(self, name: str = "stock") -> None:
-        self.stock.to_csv(os.path.join(self.data_dir, f"{name}.csv"))
+        self.stock.to_csv(os.path.join(self.data_dir, f"{name}.csv"), encoding='utf-8')
 
 
 if __name__ == "__main__":

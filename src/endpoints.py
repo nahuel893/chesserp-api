@@ -2,21 +2,85 @@ import os
 import requests
 from datetime import datetime
 from dotenv import load_dotenv
+import pandas as pd
+import io
 
-ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 
 
+columnas_importantes = '''Descripcion Empresa
+Descripcion Comprobante
+Letra
+Serie \\ Punto de venta
+Numero
+Regimen
+Motivo Rechazo / Devolucion
+Descripcion Motivo Rechazo / Devolucion
+Fecha Comprobante
+Emisor
+Sucursal
+Descripcion Sucursal
+Esquema
+Descripcion Esquema
+Deposito
+Descripcion Deposito
+Vendedor
+Descripcion Vendedor
+Sector de venta
+Descripcion de Sector de Venta
+Supervisor
+Descripcion Supervisor
+Descripcion Tipo IVA
+Fecha pedido
+Descripcion Transporte
+Cajero
+Cliente
+Razon Social
+Domicilio
+Codigo de Articulo
+Descripcion de Articulo
+MARCA
+Descripción MARCA
+GENERICO
+Descripción GENERICO
+Proveedor
+Precio de compra Bruto
+Precio de compra Neto
+Bultos Cerrados
+Unidades
+Bultos con Cargo
+Bultos sin Cargo
+Bultos Total
+Bultos Rechazados
+Precio Unitario Bruto
+Bonificacion %
+Precio Neto Unitario
+Subtotal Bruto
+Subtotal Bonificado
+Subtotal Neto
+I.V.A 21%
+I.V.A. 27%
+I.V.A. 10.5%
+Percepción 3337
+Percepción 5329
+Percepción 212
+Impuestos Internos
+Subtotal Final'''
+columnas_importantes = columnas_importantes.split("\n")
 class Endpoints:
-    def __init__(self, baseURL:str, user:str, passw:str):
-        
+    global columnas_importantes
+    ABS_PATH = os.path.dirname(os.path.abspath(__file__))
+    FATHER_PATH = os.path.dirname(ABS_PATH)
+
+    def __init__(self, baseURL: str, user: str, passw: str):
+
         self.basePath = baseURL
-        self.baseURL  = f"{self.basePath}web/api"
+        self.baseURL = f"{self.basePath}web/api"
         self.loginURL = f"{self.basePath}web/api/chess/v1/auth/login"
         self.credentials = {
             "usuario": user, "password": passw}
         self.sessionId = None
         self.depositos = {"1": ""}
-    
+
     def login(self):
         try:
             # Realizamos la solicitud POST para loguearnos
@@ -31,28 +95,28 @@ class Endpoints:
                 try:
                     # Intentamos extraer el sessionId del JSON
                     response_json = response.json()
-                    sessionId = response_json.get("sessionId")  
+                    sessionId = response_json.get("sessionId")
                     self.sessionId = sessionId
-                    self.response = response   
+                    self.response = response
+
                     if sessionId:
                         print(f"SessionId obtenido: {sessionId}")
                         return response.json()
-
                     else:
-                        print("Error: No se encontró 'sessionId' en la respuesta del servidor.")
-                        
+                        print(
+                            "Error: No se encontró 'sessionId' en la respuesta del servidor.")
                 except ValueError:
                     print("Error: La respuesta no es un JSON válido.")
-                    
             else:
-                print(f"Error en el login: {response.status_code}, Respuesta: {response.text}")
-                
+                print(
+                    f"Error en el login: {response.status_code}, Respuesta: {response.text}")
         except requests.exceptions.RequestException as e:
             print(f"Error de conexión o solicitud: {e}")
-            
-    
+
     def obtener_reporte(self, branches: list, name: str, fecha_desde: str, fecha_hasta: str):
         # Formato fecha desde y hasta: "AAAA-MM-DD"
+        reports_list = []
+        bytes_list = []
         reporte_url = self.baseURL + "/reporteComprobantesVta/exportarExcel"
         header = {"Cookie": self.sessionId}
         data_post = {
@@ -79,18 +143,21 @@ class Endpoints:
 
         try:
             for branch in branches:
-                data_post["dsFiltrosRepCbtsVta"]["eFiltros"][0]["idsucur"] = str(branch)
+                data_post["dsFiltrosRepCbtsVta"]["eFiltros"][0]["idsucur"] = str(
+                    branch)
                 # Realizamos la solicitud POST para exportar el reporte
-                response_reporte = requests.post(reporte_url, json=data_post, headers=header)
+                response_reporte = requests.post(
+                    reporte_url, json=data_post, headers=header)
 
                 # Comprobamos si la respuesta contiene el archivo para descargar
                 if response_reporte.status_code == 200:
                     # Extraemos el path del archivo del reporte
                     response_json = response_reporte.json()
                     pcArchivo = response_json.get("pcArchivo")
-                    
+
                     if pcArchivo:
-                        print(f"Archivo para descargar: {self.basePath + pcArchivo}")
+                        print(
+                            f"Archivo para descargar: {self.basePath + pcArchivo}")
                     else:
                         print("Error: No se encontró 'pcArchivo' en la respuesta.")
                         exit()
@@ -101,16 +168,35 @@ class Endpoints:
 
                     if response_excel.status_code == 200:
                         # Guardamos el archivo temporalmente
-                        with open(f"{name}-{branch}-{fecha_hasta}.xls", "wb") as f:
+                        ruta = os.path.join(self.FATHER_PATH, "data", "original", f"{name}-{branch}-{fecha_hasta}.xls")
+                        reports_list.append(ruta)
+                        with open(ruta, "wb") as f:
                             f.write(response_excel.content)
                         print("Archivo descargado correctamente.")
+
+            dfs = [pd.read_csv(path, sep="\t", encoding='latin1', low_memory=False)[columnas_importantes] for path in reports_list]
+            df  = pd.concat(dfs, ignore_index=True)
+            pivot= df.pivot_table(
+                values='Bultos Total',
+                index=['Sucursal','Codigo de Articulo'],
+                aggfunc='sum',
+            )
+            fecha = df['Fecha Comprobante'].max()
+            with open(os.path.join(self.FATHER_PATH, "data", "processed","fecha.txt"), "w") as f:
+                f.write(str(fecha))
+
+            pivot.reset_index(inplace=True)
+            pivot.to_csv(os.path.join(self.FATHER_PATH, "data", "processed", f"pivot-{fecha_hasta}.csv"), index=False)
+            df.to_excel(os.path.join(self.FATHER_PATH, "data", "processed", f"{name}-{fecha_hasta}.xlsx"), index=False)
 
         except requests.exceptions.RequestException as e:
             print(f"Error de conexión o solicitud: {e}")
             exit()
-    
+
+        return reports_list
+
     def get_sessionId(self):
-        return self.sessionId    
+        return self.sessionId
 
     def get_stock(self, date=datetime.now().strftime("%d-%m-%Y"), idDeposito="1"):
         stock_url = self.baseURL + "/chess/v1/stock/"
@@ -118,19 +204,22 @@ class Endpoints:
         params = {
             "idDeposito": idDeposito,
             "frescura": "false",
-            "DD-MM-AAAA": date 
+            "DD-MM-AAAA": date
         }
         try:
             params['idDeposito'] = idDeposito
             params['DD-MM-AAAA'] = date
-            response = requests.get(url=stock_url, params=params, headers=headers)
+            response = requests.get(
+                url=stock_url, params=params, headers=headers)
             print("Geting Stock:")
-            print(f"Request: Url:{stock_url}, Params:{params}, Headers:{headers}")
+            print(
+                f"Request: Url:{stock_url}, Params:{params}, Headers:{headers}")
 
             if response.status_code == 200:
                 return response.json()
+
         except Exception as error:
-                print("Error processing stock", error)
+            print("Error processing stock", error)
 
 
 if __name__ == "__main__":
@@ -146,8 +235,6 @@ if __name__ == "__main__":
 
     # stock = endpoint.get_stock()
     branches = [1, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16]
-
-    endpoint.obtener_reporte(branches, "ventas_hasta_hoy", "2025-05-01", "2025-05-30")
-
-
-
+    # branches = [1]
+    endpoint.obtener_reporte(
+        branches, "ventas_hasta_hoy", "2025-05-01", "2025-05-30")

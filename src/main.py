@@ -36,10 +36,10 @@ def main(): # Creamos una instancia de la clase Endpoint
     stock.transform_data()
     stock.to_csv(name="stock_b")
 
-    endp.voucher_rep("ventas_hoy", "2025-05-01", "2025-05-30")
+    #endp.voucher_rep("ventas_hoy", "2025-05-01", "2025-05-30")
 
     # Login Chess S
-    endp = Endpoints(os.getenv("API_URL_S"), os.getenv("USERNAME_B"), os.getenv("PASSWORD_B"))
+    endp = Endpoints(os.getenv("API_URL_S"), os.getenv("USERNAME_S"), os.getenv("PASSWORD_S"))
     endp.login()
 
     # Login
@@ -48,10 +48,11 @@ def main(): # Creamos una instancia de la clase Endpoint
         df_deposits_path= os.path.join(DATA_PATH, "deposits_s.csv"),
         df_bloat_articles_path= os.path.join(DATA_PATH, "bloat_articles_s.csv"),
         df_categories_path= os.path.join(DATA_PATH, "categories_s.csv"),
+        categories_id_col='Codigo'
     )
     stock.get_stocks()
     stock.transform_data()
-    stock.to_csv(name="stock_s")
+    stock.to_excel(name="stock_s")
 
     # Get report of sales
 

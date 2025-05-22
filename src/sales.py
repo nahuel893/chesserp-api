@@ -77,6 +77,8 @@ class SalesData:
         df = df[columnas_importantes]
         df.to_excel(os.path.join(base_path, '../data/procesado/'), index=False)
     
+    def process_data_reports(self):
+        
 
 
 # def insert_in_db():

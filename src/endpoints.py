@@ -6,7 +6,6 @@ import pandas as pd
 import io
 
 
-
 columnas_importantes = '''Descripcion Empresa
 Descripcion Comprobante
 Letra
@@ -66,13 +65,17 @@ Percepción 212
 Impuestos Internos
 Subtotal Final'''
 columnas_importantes = columnas_importantes.split("\n")
+
+from src.logger import get_logger
+
+logger = get_logger(__name__)
+
 class Endpoints:
     global columnas_importantes
     ABS_PATH = os.path.dirname(os.path.abspath(__file__))
     FATHER_PATH = os.path.dirname(ABS_PATH)
 
     def __init__(self, baseURL: str, user: str, passw: str):
-
         self.basePath = baseURL
         self.baseURL = f"{self.basePath}web/api"
         self.loginURL = f"{self.basePath}web/api/chess/v1/auth/login"
@@ -81,16 +84,18 @@ class Endpoints:
         self.sessionId = None
         self.depositos = {"1": ""}
 
+        logger.info("Endpoint initialized", extra={"baseURL": self.baseURL})
+
     def login(self):
         try:
             # Realizamos la solicitud POST para loguearnos
-            print("Request Login:")
-            print("basePath:", self.basePath)
-            print("loginUrl:", self.loginURL)
-            print("Credentials:", self.credentials)
+            logger.info("Login in progress")
+            logger.debug(f"basePath: {self.basePath}")
+            logger.debug(f"loginUrl: {self.loginURL}")
+            logger.debug(f"Credentials: {self.credentials}")
             response = requests.post(self.loginURL, json=self.credentials)
-            # Verificamos si la respuesta es JSON y obtenemos el sessionId
 
+            # Verificamos si la respuesta es JSON y obtenemos el sessionId
             if response.status_code == 200:
                 try:
                     # Intentamos extraer el sessionId del JSON
@@ -100,18 +105,16 @@ class Endpoints:
                     self.response = response
 
                     if sessionId:
-                        print(f"SessionId obtenido: {sessionId}")
+                        logger.info(f"SessionId obtenido: {sessionId}")
                         return response.json()
                     else:
-                        print(
-                            "Error: No se encontró 'sessionId' en la respuesta del servidor.")
+                        logger.error("No se encontró 'sessionId' en la respuesta del servidor.")
                 except ValueError:
-                    print("Error: La respuesta no es un JSON válido.")
+                    logger.error("La respuesta no es un JSON válido.")
             else:
-                print(
-                    f"Error en el login: {response.status_code}, Respuesta: {response.text}")
+                logger.error(f"Error en el login: {response.status_code}, Respuesta: {response.text}")
         except requests.exceptions.RequestException as e:
-            print(f"Error de conexión o solicitud: {e}")
+            logger.error(f"Error de conexión o solicitud: {e}")
 
     def obtener_reporte(self, branches: list, name: str, fecha_desde: str, fecha_hasta: str):
         # Formato fecha desde y hasta: "AAAA-MM-DD"
@@ -156,10 +159,10 @@ class Endpoints:
                     pcArchivo = response_json.get("pcArchivo")
 
                     if pcArchivo:
-                        print(
+                        logger.info(
                             f"Archivo para descargar: {self.basePath + pcArchivo}")
                     else:
-                        print("Error: No se encontró 'pcArchivo' en la respuesta.")
+                        logger.info("Error: No se encontró 'pcArchivo' en la respuesta.")
                         exit()
 
                     # Paso 3: Descargar el archivo
@@ -209,17 +212,17 @@ class Endpoints:
         try:
             params['idDeposito'] = idDeposito
             params['DD-MM-AAAA'] = date
-            response = requests.get(
-                url=stock_url, params=params, headers=headers)
-            print("Geting Stock:")
-            print(
-                f"Request: Url:{stock_url}, Params:{params}, Headers:{headers}")
+
+            response = requests.get(url=stock_url, params=params, headers=headers)
+            logger.debug(f"Getting Stock -- Request: Url:{stock_url}, Params:{params}, Headers:{headers}")
 
             if response.status_code == 200:
                 return response.json()
-
+            else:
+                logger.error(f"Response is not 200 code: {response.status_code}, Respuesta: {response.text[:10]}")
+                return None
         except Exception as error:
-            print("Error processing stock", error)
+            logger.error("Error getting stock", error)
 
 
 if __name__ == "__main__":
@@ -235,6 +238,7 @@ if __name__ == "__main__":
 
     # stock = endpoint.get_stock()
     branches = [1, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16]
+
     # branches = [1]
     endpoint.obtener_reporte(
         branches, "ventas_hasta_hoy", "2025-05-01", "2025-05-30")

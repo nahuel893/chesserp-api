@@ -1,9 +1,10 @@
-from endpoints import Endpoints
+from src.endpoints import Endpoints
 import pandas as pd
 import os
-
 from dotenv import load_dotenv
+from src.logger import get_logger
 
+logger = get_logger(__name__)
 
 class StockData:
     def __init__(self, endpoint):
@@ -11,6 +12,8 @@ class StockData:
         self.data_dir = os.path.abspath(os.path.join((os.getcwd()), "data"))
         self.endpoint = endpoint
         self.stock = pd.DataFrame()
+        logger.info("StockData initialized")
+        logger.debug("Endpoint: %s", endpoint)
 
     def load_extra_data(
         self,
@@ -18,7 +21,7 @@ class StockData:
         df_bloat_articles_path: str,
         df_categories_path: str,
         deposits_col: str = "Deposito",
-        bloat_articles_col: str = "CODIGO",
+        bloat_articles_id_col: str = "CODIGO",
         bloat_articles_col_flag: str = "SIRVE",
         categories_id_col: str = "CODIGO",
         categories_col: str = "GENERICO"
@@ -46,10 +49,8 @@ class StockData:
 
         # Load bloat articles and rename column
         self.df_bloat_articles = pd.read_csv(df_bloat_articles_path)
-        self.df_bloat_articles = self.df_bloat_articles[[
-            bloat_articles_col, 'SIRVE']]
-        self.df_bloat_articles.rename(
-            columns={bloat_articles_col: 'idArticulo'}, inplace=True)
+        self.df_bloat_articles = self.df_bloat_articles[[bloat_articles_id_col, 'SIRVE']]
+        self.df_bloat_articles.rename(columns={bloat_articles_id_col: 'idArticulo'}, inplace=True)
 
         # Load categories and rename column
         self.df_categories = pd.read_csv(df_categories_path)
